@@ -7,7 +7,7 @@ r"""
 import torch
 from torch import nn
 
-from attention import Attn
+from lsgm.attention import Attn
 
 import os
 import sys
@@ -30,6 +30,7 @@ class LabelSequenceDecoder(nn.Module):
         """
         super(LabelSequenceDecoder, self).__init__()
         self.hidden_dim = lab_dim
+        self.lab_num = lab_num
 
         self.lab_emb = nn.Embedding(lab_num, lab_dim)  # 标签向量层
 
@@ -38,7 +39,8 @@ class LabelSequenceDecoder(nn.Module):
         self.lstm = nn.LSTM(input_size=lab_dim,
                             hidden_size=lab_dim,
                             num_layers=config.dec_layer,
-                            dropout=config.dec_dropout)
+                            dropout=config.dec_dropout,
+                            batch_first=True)
 
         # TODO layer norm
 
@@ -63,12 +65,12 @@ class LabelSequenceDecoder(nn.Module):
 
         lab_emb = self.lab_emb(lab_seq)  # 获取标签向量
         lab_emb = self.dropout(lab_emb)  # 做dropout
-        lab_emb = lab_emb.view(1, batch_size, self.hidden_dim)
+        lab_emb = lab_emb.view(1, batch_size, self.hidden_dim)  # 变换为3维，便于送入LSTM中计算
 
         out, state = self.lstm(lab_emb, state)  # 将标签向量送入LSTM中计算
 
-        attn_w = self.attn(out, enc_outs)  # attention计算
-        context = attn_w.bmm(enc_outs.transpose(0, 1))
+        attn_w = self.attn(out, enc_outs.transpose(0, 1))  # attention计算
+        context = attn_w.bmm(enc_outs)
         concat_input = torch.cat((out.squeeze(0), context.squeeze(1)), 1)
         concat_output = torch.tanh(self.concat(concat_input))
 

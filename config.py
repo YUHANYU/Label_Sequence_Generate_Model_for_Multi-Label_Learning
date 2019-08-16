@@ -19,8 +19,8 @@ class Config:
         self.v_batch_size = 1  # 验证批次数据
         self.i_batch_size = 1  # 测试批次数据
 
-        self.lr_1 = 0.0001  # 模型学习率
-        self.lr_2 = 0.00001
+        self.lr_1 = 0.00001  # 模型学习率
+        self.lr_2 = 0.000005
 
         self.sos = 0  # 序列开始符
         self.eos = 1  # 序列结束符
@@ -38,3 +38,5 @@ class Config:
         self.dec_dropout = 0.1  # 标签序列解码器dropout大小
 
         self.log = True  # 训练&验证过程写入日志
+
+        self.teach_ratio = 0.5  # 使用教师强制训练机制的比例

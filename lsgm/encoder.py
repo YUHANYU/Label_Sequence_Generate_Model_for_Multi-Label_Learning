@@ -35,7 +35,8 @@ class FeatureChainEncoder(nn.Module):
                             hidden_size=fea_dim,
                             num_layers=config.enc_layer,
                             dropout=config.enc_dropout,
-                            bidirectional=config.enc_bi)
+                            bidirectional=config.enc_bi,
+                            batch_first=True)
         # TODO LSTM初始化权重
 
         # TODO 层规范化
@@ -47,14 +48,14 @@ class FeatureChainEncoder(nn.Module):
         :param state: LSTM状态
         :return: 编码特征链后的结果
         """
-        chain_emb = self.fea_emb(input_chain)  # 特征链对应的特征向量
+        chain_emb = self.fea_emb(input_chain).unsqueeze(0)  # 特征链对应的特征向量
 
         # TODO state的初始化
         out, state = self.lstm(chain_emb, state)  # lstm编码计算
 
         out = out[:, :, :self.hidden_dim] + out[:, :, self.hidden_dim:]  # 双向相加
 
-        return out
+        return out, state
 
 
 

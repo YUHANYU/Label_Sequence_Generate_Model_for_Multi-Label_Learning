@@ -39,18 +39,19 @@ def main(data_type, k):
     infer_data = DataLoader(infer_chain_lab, config.i_batch_size, True, drop_last=False)  # 推理数据
 
     pos_enc = FeatureChainEncoder(data.ins_num, data.fea_num, fea).to(config.device)  # 负编码器
-    pos_enc_optim = optim.SGD(pos_enc.parameters(), lr=config.lr_1)  # 负编码器的优化器
+    pos_enc_optim = optim.Adam(pos_enc.parameters(), lr=config.lr_1)  # 负编码器的优化器
     pos_dec = LabelSequenceDecoder(data.lab_num + 2, data.fea_num).to(config.device)  # 负解码器
-    pos_dec_optim = optim.SGD(pos_dec.parameters(), lr=config.lr_1)  # 负解码器的优化器
+    pos_dec_optim = optim.Adam(pos_dec.parameters(), lr=config.lr_1)  # 负解码器的优化器
 
     neg_enc = FeatureChainEncoder(data.ins_num, data.fea_num, fea).to(config.device)  # 负编码器
-    neg_enc_optim = optim.SGD(neg_enc.parameters(), lr=config.lr_1)  # 负编码器的优化器
+    neg_enc_optim = optim.Adam(neg_enc.parameters(), lr=config.lr_2)  # 负编码器的优化器
     neg_dec = LabelSequenceDecoder(data.lab_num + 2, data.fea_num).to(config.device) # 负解码器
-    neg_dec_optim = optim.SGD(neg_dec.parameters(), lr=config.lr_1)  # 负解码器的优化器
+    neg_dec_optim = optim.Adam(neg_dec.parameters(), lr=config.lr_2)  # 负解码器的优化器
 
-    model = Feature2Label()  # 特征到标签的计算模型
+    model = Feature2Label(data.lab_num)  # 特征到标签的计算模型
 
-    model.train_val(pos_enc, pos_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)
+    model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
+                    neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)
 
 
 if __name__ == '__main__':
