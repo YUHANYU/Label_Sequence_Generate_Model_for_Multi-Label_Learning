@@ -4,15 +4,15 @@ r"""
 LSGM模型工具程序
 """
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
-from lsgm.evaluate import avgprec
+from lsgm.evaluate import avgprec, mll_measures
 
-writer = SummaryWriter()
-
-for i in range(1000):
-    writer.add_scalar('loss/train', np.random.random(), i)
+# #writer = SummaryWriter()
+#
+# for i in range(1000):
+#     writer.add_scalar('loss/train', np.random.random(), i)
 
 
 def only_lab_p(lab, p):
@@ -41,6 +41,7 @@ def only_lab_p(lab, p):
 
     return new_lab, new_lab_p
 
+
 def test_val(real_lab, pre_lab, lab_num, lab_mark):
     """
     测试验证过程模型的性能，以多标记学习的平均准确率为标准
@@ -52,6 +53,51 @@ def test_val(real_lab, pre_lab, lab_num, lab_mark):
     """
     ins_num = len(real_lab)  # 验证示例数
 
+    real_lab_0_1 = real_2_real(real_lab, lab_mark, lab_num)  # 转化实际的标签为实际的0-1标签集
+
+    pre_lab_0_1 = pre_2_pre(pre_lab, ins_num, lab_mark, lab_num)  # 转化预测的标签为预测的0-1标签集
+
+    pre_lab_0_1 = [[int(lab_mark) if j == None else int(j) for j in i]
+                   for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
+
+    average_acc = avgprec(np.array(pre_lab_0_1), np.array(real_lab_0_1))  # 平均准确率
+
+    # TODO 对应的概率也要这样操作
+
+    return average_acc
+
+
+def test_infer(real_lab, pre_lab, lab_num, lab_mark):
+    """
+    测试推理过程中实际标签和预测标签的指标比较
+    :param real_lab: 预测的标签
+    :param pre_lab:实际的标签
+    :param lab_num: 标签数
+    :param lab_mark: 标签标记
+    :return:
+    """
+    ins_num = len(real_lab)  # 推理示例数
+
+    real_lab_0_1 = real_2_real(real_lab, lab_mark, lab_num)  # 转化实际的标签为实际的0-1标签集
+
+    pre_lab_0_1 = pre_2_pre(pre_lab, ins_num, lab_mark, lab_num)  # 转化预测的标签为预测的0-1标签集
+
+    pre_lab_0_1 = [[int(lab_mark) if j == None else int(j) for j in i]
+                   for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
+
+    mll_measures(np.array(pre_lab_0_1), np.array(real_lab_0_1))
+
+
+def real_2_real(real_lab, lab_mark, lab_num):
+    """
+    把正负标签转化为实际的0-1标签
+    :param real_lab: 正/负标签
+    :param lab_mark: 标签标记
+    :param lab_num:标签数
+    :return: 实际的0-1标签集
+    """
+    ins_num = len(real_lab)  # 示例数
+
     # 还原实际标签对应的0-1位置标签
     real_lab = [[int(j.cpu().numpy()) for j in i] for i in real_lab]  # tensor2list
     real_lab = [[j - 2 for j in i[:-1]] for i in real_lab]  # -2是消除开始符合结束符，还原成原来的标签位序
@@ -60,25 +106,22 @@ def test_val(real_lab, pre_lab, lab_num, lab_mark):
         for j in i:
             real_lab_0_1[idx][j] = int(abs(lab_mark - 1))  # 找到标签的位序，对应位序的位置上，标签置为lab_mark的相反标记
 
+    return real_lab_0_1
+
+
+def pre_2_pre(pre_lab, ins_num, lab_mark, lab_num):
+    """
+    把预测的标签转化为实际的0-1标签
+    :param pre_lab: 预测的标签集
+    :param ins_num: 示例数
+    :param lab_mark: 标签标记
+    :param lab_num: 标签数
+    :return: 预测的0-1标签集
+    """
     pre_lab = [[j - 2 for j in i] for i in pre_lab]  # -2是为了消除开始符合结束符，还原成实际的标签位序
     pre_lab_0_1 = [[None for _ in range(lab_num)] for _ in range(ins_num)]  # 预测的0-1标签
     for idx, i in enumerate(pre_lab):
         for j in i:
             pre_lab_0_1[idx][j] = int(abs(lab_mark - 1))  # 找到预测标签的位序，对应位序的位置上，标签置为lab_mark的相反标记
 
-    pre_lab_0_1 = [[int(lab_mark) if j == None else int(j) for j in i] for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
-
-    average_acc = avgprec(np.array(pre_lab_0_1), real_lab_0_1)  # 平均准确率
-
-    # TODO 对应的概率也要这样操作
-
-    return average_acc
-
-
-
-
-
-
-
-
-
+    return pre_lab_0_1

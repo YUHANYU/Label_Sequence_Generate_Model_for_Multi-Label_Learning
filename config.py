@@ -12,6 +12,7 @@ class Config:
     """
     def __init__(self):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.cpu_or_gpu = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         self.epochs = 100  # 训练轮次
 

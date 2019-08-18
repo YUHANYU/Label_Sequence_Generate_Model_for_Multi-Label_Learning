@@ -17,6 +17,7 @@ config = Config()
 
 
 def main(data_type, k):
+    print('多标记数据类型{}，最近邻个数{}。'.format(data_type, k))
     data = Process(data_type, k)  # 数据对象
 
     fea, lab = data.get_data()  # 获取特征集，标签集
@@ -34,9 +35,9 @@ def main(data_type, k):
     # 构建训练特征链-正负标签序列，验证特征链-正负标签序列，推理特征链-标签序列
     train_chain_lab, val_chain_lab, infer_chain_lab = data.merge_chain_lab(train_chain, val_chain, infer_chain, lab_new)
 
-    train_data = DataLoader(train_chain_lab, config.t_batch_size, True, drop_last=False)  # 训练数据
-    val_data = DataLoader(val_chain_lab, config.v_batch_size, True, drop_last=False)  # 验证数据
-    infer_data = DataLoader(infer_chain_lab, config.i_batch_size, True, drop_last=False)  # 推理数据
+    train_data = DataLoader(train_chain_lab, config.t_batch_size, shuffle=False, drop_last=False)  # 训练数据
+    val_data = DataLoader(val_chain_lab, config.v_batch_size, shuffle=False, drop_last=False)  # 验证数据
+    infer_data = DataLoader(infer_chain_lab, config.i_batch_size, shuffle=False, drop_last=False)  # 推理数据
 
     pos_enc = FeatureChainEncoder(data.ins_num, data.fea_num, fea).to(config.device)  # 负编码器
     pos_enc_optim = optim.Adam(pos_enc.parameters(), lr=config.lr_1)  # 负编码器的优化器
@@ -50,9 +51,11 @@ def main(data_type, k):
 
     model = Feature2Label(data.lab_num)  # 特征到标签的计算模型
 
-    model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
-                    neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)
+    # model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
+    #                 neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)  # 模型训练&验证
+
+    model.infer(data, infer_data, fea)
 
 
 if __name__ == '__main__':
-    main('emotions', 10)
+    main('yeast', 10)
