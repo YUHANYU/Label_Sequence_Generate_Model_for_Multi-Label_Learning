@@ -41,3 +41,5 @@ class Config:
         self.log = True  # 训练&验证过程写入日志
 
         self.teach_ratio = 0.5  # 使用教师强制训练机制的比例
+
+        self.gli = True  # 是否加入全局标签信息，使用后，叠加之前预测过的所有标签向量

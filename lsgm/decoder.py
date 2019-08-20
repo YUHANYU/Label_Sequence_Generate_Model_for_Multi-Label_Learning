@@ -6,6 +6,7 @@ r"""
 
 import torch
 from torch import nn
+from torch.autograd import Variable
 
 from lsgm.attention import Attn
 
@@ -61,9 +62,15 @@ class LabelSequenceDecoder(nn.Module):
         :param enc_outs: 编码器全部的输出
         :return: 解码输出标记，新LSTM状态，各个标签的预测概率
         """
-        batch_size = lab_seq.shape[0]  # 批次大小
+        if config.gli:  # 如果使用全局标签信息
+            batch_size = config.t_batch_size
+            lab_seq = Variable(torch.LongTensor(lab_seq)).to(config.device)  # list元素转化为tensor
+            lab_emb = self.lab_emb(lab_seq) # 获取所有元素的标签向量
+            lab_emb = torch.sum(lab_emb, dim=0).unsqueeze(0)  # 全部标签向量叠加
+        else:
+            batch_size = lab_seq.shape[0]  # 批次大小
+            lab_emb = self.lab_emb(lab_seq)  # 获取标签向量
 
-        lab_emb = self.lab_emb(lab_seq)  # 获取标签向量
         lab_emb = self.dropout(lab_emb)  # 做dropout
         lab_emb = lab_emb.view(1, batch_size, self.hidden_dim)  # 变换为3维，便于送入LSTM中计算
 

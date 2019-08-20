@@ -117,7 +117,7 @@ class Feature2Label:
             pos_loss_all = 0  # 正：一个训练轮次所有批次的总损失
             neg_loss_all = 0  # 负：一个训练轮次所有批次的总损失
 
-            for batch_data in tqdm(train_data):  # 迭代批次数据，训练模型
+            for batch_data in tqdm(train_data, desc='Training', leave=False):  # 迭代批次数据，训练模型
                 fea_var, pos_lab_var, neg_lab_var = batch2tensor(batch_data)  # 转化得到特征变量，正标签变量，负标签变量
 
                 pos_loss = _model_train(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim, fea_var, pos_lab_var)  # 正损失
@@ -158,7 +158,10 @@ class Feature2Label:
 
         dec_state = (enc_state[0][:config.dec_layer], enc_state[1][:config.dec_layer])  # 解码器初始状态=编码最后时刻的状态
 
-        dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器初始输入为sos序列开始符
+        if config.gli:  # 如果使用全局标签信息
+            dec_input = [config.sos] # 标签输入将会存储每一个已经预测出来的标签信息
+        else:
+            dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器初始输入为sos序列开始符
 
         tgt_len = len(tgt_seq)  # 标签变量个数
 
@@ -174,9 +177,15 @@ class Feature2Label:
             if use_teacher:  # 使用教师强制训练机制，自己的输出作为下一步的输入
                 top_value, top_idx = dec_out.data.topk(1)  # 最大值和索引
                 idx = int(top_idx[0][0].cpu().numpy())
-                dec_input = Variable(torch.LongTensor([idx])).to(config.device)
+                if config.gli:  # 如果使用全局标签信息
+                    dec_input.append(idx)
+                else:  # 不使用全局标签信息
+                    dec_input = Variable(torch.LongTensor([idx])).to(config.device)
             else:  # 不使用教师强制训练机制，实际的标签作为下一步的输入
-                dec_input = Variable(torch.LongTensor([tgt_seq[i]])).to(config.device)
+                if config.gli:  # 如果使用全局标签信息
+                    dec_input.append(int(tgt_seq[i].cpu().numpy()))  # FIXME 这里要把tensor进行转化
+                else:
+                    dec_input = Variable(torch.LongTensor([tgt_seq[i]])).to(config.device)
 
         dec_all_out = dec_all_out.transpose(0, 1).squeeze(0)  # 全部的预测标签向量
         loss = self.criterion(dec_all_out, tgt_seq)  # 计算预测的标签向量和实际的标签序号之间的损失
@@ -200,7 +209,7 @@ class Feature2Label:
         real_pos_lab, real_neg_lab = [], []  # 实际的正标签和负标签
 
         with torch.no_grad():  # 无梯度，不跟新模参数
-            for batch_data in tqdm(val_data):  # 迭代批次数据，验证模型
+            for batch_data in tqdm(val_data, desc='Validating', leave=False):  # 迭代批次数据，验证模型
                 fea_var, pos_lab_var, neg_lab_var = batch2tensor(batch_data)  # 转化得到特征变量，正标签变量和负标签变量
                 real_pos_lab.append(pos_lab_var)  # 收集每一批次实际的正标签
                 real_neg_lab.append(neg_lab_var)  # 收集每一批次实际的负标签
@@ -273,7 +282,10 @@ class Feature2Label:
 
         dec_state = (enc_state[0][:config.dec_layer], enc_state[1][:config.dec_layer])  # 解码器初始状态=编码器最后状态
 
-        dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器第一个输入为sos开始符
+        if config.gli:  # 如果使用全局标签信息
+            dec_input = [config.sos]
+        else:
+            dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器第一个输入为sos开始符
 
         pre_lab = []  # 预测的标签
         pre_lab_p = []  # 预测的标签的概率
@@ -286,7 +298,10 @@ class Feature2Label:
             if idx == config.eos:  # 如果预测的是eos结束符
                 break  # 结束解码循环
             else:  # 预测解码出来的不是eos结束符
-                dec_input = Variable(torch.LongTensor([idx])).to(config.device)  # 解码器预测的作为下一个输入
+                if config.gli:  # 如果使用全局标签信息
+                    dec_input.append(idx)
+                else:
+                    dec_input = Variable(torch.LongTensor([idx])).to(config.device)  # 解码器预测的作为下一个输入
 
                 top_value, top_idx = dec_out_p.data.topk(1)  # 解码标签概率向量中最大的值和位置
                 p = int(top_value[0][0].cpu().numpy())  # 预测出来的标签概率
@@ -308,23 +323,23 @@ class Feature2Label:
 
         checkpoint_path = os.path.abspath('.') + '/results/'  # 保存点路径
 
-        pos_enc = FeatureChainEncoder(data_obj.ins_num, data_obj.fea_num, fea)  # 正特征编码器
+        pos_enc = FeatureChainEncoder(data_obj.ins_num, data_obj.fea_num, fea).to(config.device)  # 正特征编码器
         pos_enc_checkpoint = torch.load(checkpoint_path + 'pos_enc.chkpt', map_location=config.cpu_or_gpu)  # 对应的保存点
         pos_enc.load_state_dict(pos_enc_checkpoint['pos_enc'])  # 加载状态
 
-        pos_dec = LabelSequenceDecoder(data_obj.lab_num + 2, data_obj.fea_num)  # 正标签解码器
+        pos_dec = LabelSequenceDecoder(data_obj.lab_num + 2, data_obj.fea_num).to(config.device)  # 正标签解码器
         pos_dec_checkpoint = torch.load(checkpoint_path + 'pos_dec.chkpt', map_location=config.cpu_or_gpu)  # 对应的保存点
         pos_dec.load_state_dict(pos_dec_checkpoint['pos_dec'])  # 加载状态
 
-        neg_enc = FeatureChainEncoder(data_obj.ins_num, data_obj.fea_num, fea)  # 正特征编码器
+        neg_enc = FeatureChainEncoder(data_obj.ins_num, data_obj.fea_num, fea).to(config.device)  # 正特征编码器
         neg_enc_checkpoint = torch.load(checkpoint_path + 'neg_enc.chkpt', map_location=config.cpu_or_gpu)  # 对应的保存点
         neg_enc.load_state_dict(neg_enc_checkpoint['neg_enc'])  # 加载状态
 
-        neg_dec = LabelSequenceDecoder(data_obj.lab_num + 2, data_obj.fea_num)  # 正标签解码器
+        neg_dec = LabelSequenceDecoder(data_obj.lab_num + 2, data_obj.fea_num).to(config.device)  # 正标签解码器
         neg_dec_checkpoint = torch.load(checkpoint_path + 'neg_dec.chkpt', map_location=config.cpu_or_gpu)  # 对应的保存点
         neg_dec.load_state_dict(neg_dec_checkpoint['neg_dec'])  # 加载状态
 
-        print('\n===加载预训练模型完成！\n')
+        print('\n===加载预训练模型完成===\n')
 
         pre_pos_lab = []  # 推理的正标签
         pre_pos_lab_p = []  # 推理的正标签对应的生成概率
@@ -373,7 +388,10 @@ class Feature2Label:
 
         dec_state = (enc_state[0][:config.dec_layer], enc_state[1][:config.dec_layer])  # 解码器初始状态=编码器最后状态
 
-        dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器第一个输入为sos开始符
+        if config.gli:  # 如果使用全局标签信息
+            dec_input = [config.sos]
+        else:
+            dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)  # 解码器第一个输入为sos开始符
 
         pre_lab = []  # 预测的标签
         pre_lab_p = []  # 预测的标签的概率
@@ -386,7 +404,10 @@ class Feature2Label:
             if idx == config.eos:  # 如果预测的是eos结束符
                 break  # 结束解码循环
             else:  # 预测解码出来的不是eos结束符
-                dec_input = Variable(torch.LongTensor([idx])).to(config.device)  # 解码器预测的作为下一个输入
+                if config.gli:  # 如果使用全局标签信息
+                    dec_input.append(idx)
+                else:
+                    dec_input = Variable(torch.LongTensor([idx])).to(config.device)  # 解码器预测的作为下一个输入
 
                 top_value, top_idx = dec_out_p.data.topk(1)  # 解码标签概率向量中最大的值和位置
                 p = int(top_value[0][0].cpu().numpy())  # 预测出来的标签概率

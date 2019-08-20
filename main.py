@@ -17,7 +17,8 @@ config = Config()
 
 
 def main(data_type, k):
-    print('多标记数据类型{}，最近邻个数{}。'.format(data_type, k))
+    print('多标记数据类型{} | 最近邻个数{} | {}使用全局标签信息'.format(data_type, k, '有' if config.gli else '没有'))
+
     data = Process(data_type, k)  # 数据对象
 
     fea, lab = data.get_data()  # 获取特征集，标签集
@@ -51,11 +52,11 @@ def main(data_type, k):
 
     model = Feature2Label(data.lab_num)  # 特征到标签的计算模型
 
-    # model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
-    #                 neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)  # 模型训练&验证
+    model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
+                    neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)  # 模型训练&验证
 
     model.infer(data, infer_data, fea)
 
 
 if __name__ == '__main__':
-    main('yeast', 10)
+    main('emotions', 10)

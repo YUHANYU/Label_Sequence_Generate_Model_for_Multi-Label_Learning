@@ -48,7 +48,7 @@ class FeatureChainEncoder(nn.Module):
         :param state: LSTM状态
         :return: 编码特征链后的结果
         """
-        chain_emb = self.fea_emb(input_chain).unsqueeze(0)  # 特征链对应的特征向量
+        chain_emb = self.fea_emb(input_chain).unsqueeze(0).to(config.device)  # 特征链对应的特征向量
 
         # TODO state的初始化
         out, state = self.lstm(chain_emb, state)  # lstm编码计算
