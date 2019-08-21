@@ -67,7 +67,7 @@ def test_val(real_lab, pre_lab, lab_num, lab_mark):
     return average_acc
 
 
-def test_infer(real_lab, pre_lab, lab_num, lab_mark):
+def test_infer(real_lab, pre_lab, pre_lab_p, lab_num, lab_mark):
     """
     测试推理过程中实际标签和预测标签的指标比较
     :param real_lab: 预测的标签
@@ -82,10 +82,14 @@ def test_infer(real_lab, pre_lab, lab_num, lab_mark):
 
     pre_lab_0_1 = pre_2_pre(pre_lab, ins_num, lab_mark, lab_num)  # 转化预测的标签为预测的0-1标签集
 
-    pre_lab_0_1 = [[int(lab_mark) if j == None else int(j) for j in i]
-                   for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
+    pre_lab_p = p_2_p(pre_lab_0_1, pre_lab_p, ins_num, lab_num)
 
-    mll_measures(np.array(pre_lab_0_1), np.array(real_lab_0_1))
+    pre_lab_0_1_new = [[int(lab_mark) if j == None else int(j) for j in i]
+                      for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
+
+    results = mll_measures(np.array(pre_lab_0_1_new), np.array(real_lab_0_1))
+
+    return real_lab_0_1, pre_lab_0_1, pre_lab_p, results
 
 
 def real_2_real(real_lab, lab_mark, lab_num):
@@ -125,3 +129,57 @@ def pre_2_pre(pre_lab, ins_num, lab_mark, lab_num):
             pre_lab_0_1[idx][j] = int(abs(lab_mark - 1))  # 找到预测标签的位序，对应位序的位置上，标签置为lab_mark的相反标记
 
     return pre_lab_0_1
+
+
+def p_2_p(lab, lab_p, ins_num, lab_num):
+    """
+    将标签概率集转化为对应标签集的概率集
+    :param lab: 标签集
+    :param lab_p: 标签的概率集
+    :param ins_num: 示例数
+    :param lab_num: 标签数
+    :param lab_mark: 标签标记
+    :return: 转化后的标签标记集
+    """
+    pre_lab_p = [[None for _ in range(lab_num)] for _ in range(ins_num)]  # 生成空的标签概率集
+    for idx_1, i in enumerate(lab):
+        lab_count = -1
+        for idx_2, j in enumerate(i):
+            if j != None:
+                lab_count += 1
+                pre_lab_p[idx_1][idx_2] = lab_p[idx_1][lab_count]
+
+    return pre_lab_p
+
+
+def mean_std(result, result_type):
+    """
+    展示数据集的均值+标注差
+    :param result: 10折交叉验证测评结果
+    :param result_type: 结果类型
+    :return:
+    """
+    hamming_loss = np.array(result)[:, 0]
+    coverage = np.array(result)[:, 1]
+    one_error = np.array(result)[:, 2]
+    rank_loss = np.array(result)[:, 3]
+    average_p = np.array(result)[:, 4]
+    subset_acc = np.array(result)[:, 5]
+
+    print('\n{}10折交叉验证结果！'.format(result_type))
+
+    print('越大越好'
+          '| 子集准确率{}+{}'
+          '| 平均准确率{}+{}'.format(round(subset_acc.mean(), 3), round(subset_acc.std(), 3),
+                                   round(average_p.mean(), 3), round(average_p.std(), 3)))
+
+    print('越小越好'
+          '| 汉明损失{}+{}'
+          '| 唯一错误率{}+{}'
+          '| 平均度{}+{}'
+          '| 排名损失{}+{}\n'.format(round(hamming_loss.mean(), 3), round(hamming_loss.std(), 3),
+                                   round(one_error.mean(), 3), round(one_error.std(), 3),
+                                   round(coverage.mean(), 3), round(coverage.std(), 3),
+                                   round(rank_loss.mean(), 3), round(rank_loss.std(), 3)))
+
+

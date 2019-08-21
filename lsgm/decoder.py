@@ -66,7 +66,7 @@ class LabelSequenceDecoder(nn.Module):
             batch_size = config.t_batch_size
             lab_seq = Variable(torch.LongTensor(lab_seq)).to(config.device)  # list元素转化为tensor
             lab_emb = self.lab_emb(lab_seq) # 获取所有元素的标签向量
-            lab_emb = torch.sum(lab_emb, dim=0).unsqueeze(0)  # 全部标签向量叠加
+            lab_emb = torch.sum(lab_emb, dim=0).unsqueeze(0)  # 全部标签向量叠加成一个混合标签向量
         else:
             batch_size = lab_seq.shape[0]  # 批次大小
             lab_emb = self.lab_emb(lab_seq)  # 获取标签向量

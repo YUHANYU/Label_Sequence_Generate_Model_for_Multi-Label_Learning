@@ -9,9 +9,11 @@ from torch import optim, nn
 from torch.autograd import Variable
 
 from lsgm.utils import only_lab_p, test_val, test_infer
+from lsgm.merger_p_p import merge_p_p
 from lsgm.encoder import FeatureChainEncoder
 from lsgm.decoder import LabelSequenceDecoder
 
+import numpy as np
 from tqdm import tqdm
 import os
 import sys
@@ -47,12 +49,15 @@ class Feature2Label:
     """
     特征序列到标签序列计算类
     """
-    def __init__(self, lab_num):
+    def __init__(self, ins_num, lab_num, alpha, beta):
         """
         特征到标签类初始函数
         :param lab_num: 实际标签数
         """
         self.criterion = nn.CrossEntropyLoss()  # 采用交叉熵损失函数计算预测和目标
+        self.alpha = alpha  # 标签正先验概率
+        self.beta = beta  # 负先验概率
+        self.ins_num = ins_num
         self.lab_num = lab_num
         self.pos_val_acc = [0]  # 正编码-解码器验证所有批次的准确率
         self.neg_val_acc = [0]  # 负编码-解码器验证所有批次的准确率
@@ -364,13 +369,21 @@ class Feature2Label:
                 pre_neg_lab.append(neg_lab)
                 pre_neg_lab_p.append(neg_lab_p)
 
-        pre_pos_lab, pre_pos_lab_p = only_lab_p(pre_pos_lab, pre_pos_lab_p)  # 正标签消歧
-        test_infer(real_pos_lab, pre_pos_lab, self.lab_num, 0)  # 测评模型
+        pre_pos_lab, pre_pos_lab_p = only_lab_p(pre_pos_lab, pre_pos_lab_p)  # 正标签和对应的概率集消歧
+        real_lab_pos, pre_pos_lab, pre_pos_lab_p, pos_result = test_infer(
+            real_pos_lab, pre_pos_lab, pre_pos_lab_p, self.lab_num, 0)  # 测评模型
 
         pre_neg_lab, pre_neg_lab_p = only_lab_p(pre_neg_lab, pre_neg_lab_p)  # 负标签消歧
-        test_infer(real_neg_lab, pre_neg_lab, self.lab_num, 1)  # 测评模型
+        real_lab_neg, pre_neg_lab, pre_neg_lab_p, neg_result = test_infer(
+            real_neg_lab, pre_neg_lab, pre_neg_lab_p, self.lab_num, 1)  # 测评模型
 
-        # TODO 保存实际标签，预测标签，对应的生成概率
+        merge_result = merge_p_p(self.alpha, self.beta,  #  融合先验概率和生成概率，再次测评模型
+                                 np.array(real_lab_pos), np.array(real_lab_neg),
+                                 np.array(pre_pos_lab), np.array(pre_pos_lab_p),
+                                 np.array(pre_neg_lab), np.array(pre_neg_lab_p),
+                                 self.ins_num, self.lab_num)
+
+        return pos_result, neg_result, merge_result
 
     def _infer_batch(self, enc, dec, src_seq, lab_num):
         """
@@ -410,7 +423,7 @@ class Feature2Label:
                     dec_input = Variable(torch.LongTensor([idx])).to(config.device)  # 解码器预测的作为下一个输入
 
                 top_value, top_idx = dec_out_p.data.topk(1)  # 解码标签概率向量中最大的值和位置
-                p = int(top_value[0][0].cpu().numpy())  # 预测出来的标签概率
+                p = round(float(top_value[0][0].cpu().numpy()), 3)  # 预测出来的标签概率
 
                 pre_lab.append(idx)  # 收集解码出来的标签
                 pre_lab_p.append(p)  # 对应解码标签的解码概率

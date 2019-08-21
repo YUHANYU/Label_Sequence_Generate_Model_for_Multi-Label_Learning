@@ -14,14 +14,14 @@ class Config:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.cpu_or_gpu = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        self.epochs = 100  # 训练轮次
+        self.epochs = 50  # 训练轮次
 
         self.t_batch_size = 1  # 训练批次数
         self.v_batch_size = 1  # 验证批次数据
         self.i_batch_size = 1  # 测试批次数据
 
         self.lr_1 = 0.00001  # 模型学习率
-        self.lr_2 = 0.000005
+        self.lr_2 = 0.0000065
 
         self.sos = 0  # 序列开始符
         self.eos = 1  # 序列结束符

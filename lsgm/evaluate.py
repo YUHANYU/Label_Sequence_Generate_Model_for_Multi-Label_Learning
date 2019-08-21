@@ -259,7 +259,7 @@ def mll_measures(y_pre, y_tgt):
     average_p = round(avgprec(y_pre, y_tgt), 3)
     subset_acc = round(SubsetAccuracy(y_pre, y_tgt), 3)
 
-    print('模型推理结果！\n')
+    print('模型推理结果！')
 
     print('越大越好'
           '| 子集准确率{}'
@@ -269,7 +269,9 @@ def mll_measures(y_pre, y_tgt):
           '| 汉明损失{}'
           '| 唯一错误率{}'
           '| 平均度{}'
-          '| 排名损失{}'.format(hamming_loss, coverage, one_error, rank_loss))
+          '| 排名损失{}\n'.format(hamming_loss, coverage, one_error, rank_loss))
+
+    return [hamming_loss, coverage, one_error, rank_loss, average_p, subset_acc]
 
 
 
