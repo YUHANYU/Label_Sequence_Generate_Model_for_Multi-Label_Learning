@@ -10,6 +10,7 @@ from torch import optim
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 import numpy as np
+import os
 
 from data.process import Process
 from lsgm.encoder import FeatureChainEncoder
@@ -28,18 +29,19 @@ def main(data_type, k):
 
     fea, lab = data.get_data()  # 获取特征集，标签集
 
-    lab_new = data.sort_lab_order(lab, 'd')  # 降序排列标签集
+    lab_new = data.sort_lab_order(lab.copy(), 'a')  # 降序排列标签集
 
-    fea_idx = np.column_stack((fea, [i for i in range(fea.shape[0])]))  # 特征集最后加上序号
-    lab_new_idx = np.column_stack((lab_new, [i for i in range(lab_new.shape[0])]))  # 标签集最后加上序号
+    fea_idx = np.column_stack((fea.copy(), [i for i in range(fea.shape[0])]))  # 特征集最后加上序号
+    lab_new_idx = np.column_stack((lab_new.copy(), [i for i in range(lab_new.shape[0])]))  # 标签集最后加上序号
 
     kf = KFold(n_splits=10, shuffle=True)  # 10折交叉训练，验证，推理模型
     pos_results = []  # 正结果
     neg_results = []  # 负结果
     merge_results = []  # 融合结果
+    measures_file = open('./results/measures.txt', 'w', encoding='utf-8')
 
     idx = 0  # 训练-验证-推理次数计数
-    for train_idx, val_infer_idx in kf.split(fea_idx):  # 9-1切分训练，验证-测试数据
+    for train_idx, val_infer_idx in kf.split([i for i in range(fea.shape[0])]):  # 9-1切分训练，验证-测试数据
         idx += 1
         print('模型第{}次训练-验证-推理'.format(idx))
 
@@ -52,7 +54,7 @@ def main(data_type, k):
 
         alpha, beta = data.get_alpha_beta(infer_k, lab_new, k)  # 获得推理集的标签先验概率alpha和beta
 
-        train_chain, val_chain, infer_chain = data.build_fea_chain('mix', train_k, val_k, infer_k)  # 构建训练，验证和推理特征链
+        train_chain, val_chain, infer_chain = data.build_fea_chain('mix-random', train_k, val_k, infer_k)  # 构建训练，验证和推理特征链
 
         train_chain_lab, val_chain_lab, infer_chain_lab = data.merge_chain_lab(  # 构建训练特&验证&推理的征链-正负标签序列
             train_chain, val_chain, infer_chain, lab_new)
@@ -76,15 +78,16 @@ def main(data_type, k):
         model.train_val(pos_enc, pos_enc_optim, pos_dec, pos_dec_optim,
                         neg_enc, neg_enc_optim, neg_dec, neg_dec_optim, train_data, val_data)  # 模型训练&验证
 
-        pos_result, neg_result, merge_result = model.infer(data, infer_data, fea)  # 模型推理预测
+        pos_result, neg_result, merge_result = model.infer(data, infer_data, fea, measures_file)  # 模型推理预测
 
         pos_results.append(list(pos_result))
         neg_results.append(list(neg_result))
         merge_results.append(list(merge_result))
 
-    mean_std(pos_results, '正编码-解码器')
-    mean_std(neg_results, '负编码-解码器')
-    mean_std(merge_results, '融合标签方法')
+    mean_std(pos_results, '正编码-解码器', measures_file)
+    mean_std(neg_results, '负编码-解码器', measures_file)
+    mean_std(merge_results, '融合标签方法', measures_file)
+    measures_file.close()
 
 if __name__ == '__main__':
-    main('emotions', 10)
+    main('image', 1)

@@ -117,7 +117,7 @@ class Feature2Label:
                 .format(epoch=0, loss=0))
 
         for epoch in range(config.epochs):
-            print('\n[训练轮次 {}]'.format(epoch))
+            print('[训练轮次 {}]'.format(epoch))
 
             pos_loss_all = 0  # 正：一个训练轮次所有批次的总损失
             neg_loss_all = 0  # 负：一个训练轮次所有批次的总损失
@@ -316,7 +316,7 @@ class Feature2Label:
 
         return pre_lab, pre_lab_p
 
-    def infer(self, data_obj, infer_data, fea):
+    def infer(self, data_obj, infer_data, fea, f):
         """
         特征到标签模型的推理部分
         :param data_obj: 数据对象
@@ -371,17 +371,18 @@ class Feature2Label:
 
         pre_pos_lab, pre_pos_lab_p = only_lab_p(pre_pos_lab, pre_pos_lab_p)  # 正标签和对应的概率集消歧
         real_lab_pos, pre_pos_lab, pre_pos_lab_p, pos_result = test_infer(
-            real_pos_lab, pre_pos_lab, pre_pos_lab_p, self.lab_num, 0)  # 测评模型
+            real_pos_lab, pre_pos_lab, pre_pos_lab_p, self.lab_num, 0, '正', f)  # 测评模型
 
         pre_neg_lab, pre_neg_lab_p = only_lab_p(pre_neg_lab, pre_neg_lab_p)  # 负标签消歧
         real_lab_neg, pre_neg_lab, pre_neg_lab_p, neg_result = test_infer(
-            real_neg_lab, pre_neg_lab, pre_neg_lab_p, self.lab_num, 1)  # 测评模型
+            real_neg_lab, pre_neg_lab, pre_neg_lab_p, self.lab_num, 1, '负', f)  # 测评模型
 
         merge_result = merge_p_p(self.alpha, self.beta,  #  融合先验概率和生成概率，再次测评模型
                                  np.array(real_lab_pos), np.array(real_lab_neg),
                                  np.array(pre_pos_lab), np.array(pre_pos_lab_p),
                                  np.array(pre_neg_lab), np.array(pre_neg_lab_p),
-                                 self.ins_num, self.lab_num)
+                                 self.ins_num, self.lab_num, f)
+        f.write('\n\n')
 
         return pos_result, neg_result, merge_result
 
@@ -429,3 +430,50 @@ class Feature2Label:
                 pre_lab_p.append(p)  # 对应解码标签的解码概率
 
         return pre_lab, pre_lab_p
+
+    def _infer_batch_beam_search(self, enc, dec, src_seq, lab_num):
+        """
+        推理部分编码-解码器，加入beam search 技术
+        :param enc:
+        :param dec:
+        :param src_seq:
+        :param lab_num:
+        :param beam_size:
+        :return:
+        """
+        enc.eval()
+        dec.eval()
+
+        enc_out, enc_state = enc(src_seq, None)  # 编码器编码特征链
+
+        dec_state = (enc_state[0][:config.dec_layer], enc_state[1][:config.dec_layer])  # 解码器初始状态=编码器最后时刻状态
+
+        if config.gli:  # 如果使用全局标签信息
+            dec_input = [config.sos]
+        else:
+            dec_input = Variable(torch.LongTensor([config.sos])).to(config.device)
+
+        pre_lab = []  # 预测出来的标签序列
+        pre_lab_b = []  # 对应标签序列的概率
+
+        dec_out, dec_state, dec_out_p = dec(dec_input, dec_state, enc_out)  # 解码器解码sos标签
+        top_value, top_idx = dec_out.data.topk(config.beam_size)  # 找出top beam size个下一个token
+        idx = int(top_idx.squeeze(0).cpu().numpy())  # beam size个token
+
+        lab_count = 0  # 解码标签数据预测
+        while lab_count <= lab_num - 1:  # 最长预测序列长度为标签总数
+            count_idx = []
+            for j in idx:   # 没一个token都要继续进行解码预测
+                if config.gli:  # 如果使用全局标签信息
+                    dec_input = dec_input.append(j)
+                else:
+                    dec_input = Variable(torch.LongTensor([j])).to(config.device)
+
+                dec_out, dec_state, dec_out_p = dec(dec_input, dec_state, enc_out)  # 解码器解码sos标签
+                top_value, top_idx = dec_out.data.topk(config.beam_size)  # 找出top beam size个下一个token
+                count_idx.append()
+
+
+
+        return pre_lab, pre_lab_b
+

@@ -9,6 +9,9 @@ import numpy as np
 
 from lsgm.evaluate import avgprec, mll_measures
 
+from config import Config
+config = Config()
+
 # #writer = SummaryWriter()
 #
 # for i in range(1000):
@@ -67,7 +70,7 @@ def test_val(real_lab, pre_lab, lab_num, lab_mark):
     return average_acc
 
 
-def test_infer(real_lab, pre_lab, pre_lab_p, lab_num, lab_mark):
+def test_infer(real_lab, pre_lab, pre_lab_p, lab_num, lab_mark, model_type, f):
     """
     测试推理过程中实际标签和预测标签的指标比较
     :param real_lab: 预测的标签
@@ -85,9 +88,11 @@ def test_infer(real_lab, pre_lab, pre_lab_p, lab_num, lab_mark):
     pre_lab_p = p_2_p(pre_lab_0_1, pre_lab_p, ins_num, lab_num)
 
     pre_lab_0_1_new = [[int(lab_mark) if j == None else int(j) for j in i]
-                      for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
+                       for i in pre_lab_0_1]  # 为了进行测评，需要转化None标记为lab_mark
 
-    results = mll_measures(np.array(pre_lab_0_1_new), np.array(real_lab_0_1))
+    print('{}模型推理结果！'.format(model_type))
+    f.write('{}模型推理结果！\n'.format(model_type))
+    results = mll_measures(np.array(pre_lab_0_1_new), np.array(real_lab_0_1), f)
 
     return real_lab_0_1, pre_lab_0_1, pre_lab_p, results
 
@@ -152,7 +157,7 @@ def p_2_p(lab, lab_p, ins_num, lab_num):
     return pre_lab_p
 
 
-def mean_std(result, result_type):
+def mean_std(result, result_type, f):
     """
     展示数据集的均值+标注差
     :param result: 10折交叉验证测评结果
@@ -167,10 +172,15 @@ def mean_std(result, result_type):
     subset_acc = np.array(result)[:, 5]
 
     print('\n{}10折交叉验证结果！'.format(result_type))
+    f.write('{}10折交叉验证结果！\n'.format(result_type))
 
     print('越大越好'
           '| 子集准确率{}+{}'
           '| 平均准确率{}+{}'.format(round(subset_acc.mean(), 3), round(subset_acc.std(), 3),
+                                   round(average_p.mean(), 3), round(average_p.std(), 3)))
+    f.write('越大越好'
+          '| 子集准确率{}+{}'
+          '| 平均准确率{}+{}\n'.format(round(subset_acc.mean(), 3), round(subset_acc.std(), 3),
                                    round(average_p.mean(), 3), round(average_p.std(), 3)))
 
     print('越小越好'
@@ -181,5 +191,13 @@ def mean_std(result, result_type):
                                    round(one_error.mean(), 3), round(one_error.std(), 3),
                                    round(coverage.mean(), 3), round(coverage.std(), 3),
                                    round(rank_loss.mean(), 3), round(rank_loss.std(), 3)))
+    f.write('越小越好'
+          '| 汉明损失{}+{}'
+          '| 唯一错误率{}+{}'
+          '| 平均度{}+{}'
+          '| 排名损失{}+{}\n\n'.format(round(hamming_loss.mean(), 3), round(hamming_loss.std(), 3),
+                                  round(one_error.mean(), 3), round(one_error.std(), 3),
+                                  round(coverage.mean(), 3), round(coverage.std(), 3),
+                                  round(rank_loss.mean(), 3), round(rank_loss.std(), 3)))
 
 

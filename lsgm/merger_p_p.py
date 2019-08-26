@@ -8,8 +8,11 @@ from .utils import real_2_real, pre_2_pre, mll_measures
 
 import numpy as np
 
+from config import Config
+config = Config()
 
-def merge_p_p(alpha, beta, real_lab_pos, real_lab_neg, pos_lab, pos_lab_p, neg_lab, neg_lab_p, ins_num, lab_num):
+
+def merge_p_p(alpha, beta, real_lab_pos, real_lab_neg, pos_lab, pos_lab_p, neg_lab, neg_lab_p, ins_num, lab_num, f):
     """
     根据标签的先验概率和生成概率，基于已初步预测出来的标签和概率，根据概率进行融合
     :param real_lab_pos: 正编码-解码的真实标签集
@@ -30,26 +33,29 @@ def merge_p_p(alpha, beta, real_lab_pos, real_lab_neg, pos_lab, pos_lab_p, neg_l
             assert real_lab_pos[i][j] == real_lab_neg[i][j]
             '正编码-解码器的真实标签和负编码-解码器的真实标签不一致！！！'
 
-    merge_lab = [[0 for _ in range(lab_num)] for _ in range(ins_num)]
+    merge_lab = [[None for _ in range(lab_num)] for _ in range(ins_num)]
 
     for i in range(ins_num):
         for j in range(lab_num):
             p, q = 0, 0
             if pos_lab[i][j] == None:
-                q += 1
+                q += 0.6
             else:
                 p = pos_lab_p[i][j]
 
             if neg_lab[i][j] == None:
-                p += 1
+                p += 0.4
             else:
                 q = neg_lab_p[i][j]
 
-            if p * alpha[i][j] > q * beta[i][j]:
+            if p * alpha[i][j] * config.alpha > q * beta[i][j] * config.beta:
                 merge_lab[i][j] = 1
             else:
                 merge_lab[i][j] = 0
 
-    results = mll_measures(np.array(merge_lab), real_lab_pos)
+    print('融合正负模型推理结果！')
+    f.write('融合正负模型推理结果！\n')
+    results = mll_measures(np.array(merge_lab), real_lab_pos, f)
+    f.write('\n\n')
 
     return results

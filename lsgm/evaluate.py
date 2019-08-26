@@ -6,6 +6,9 @@ r"""
 
 import numpy as np
 
+from config import Config
+config = Config()
+
 def find(instance, label1, label2):
     index1 = []
     index2 = []
@@ -244,7 +247,7 @@ def Performance(predict_labels, test_target):
     return I / data_num
 
 
-def mll_measures(y_pre, y_tgt):
+def mll_measures(y_pre, y_tgt, f):
     """
     衡量模型的多标记学习指标
     :param y_pre: 预测标签集
@@ -259,13 +262,19 @@ def mll_measures(y_pre, y_tgt):
     average_p = round(avgprec(y_pre, y_tgt), 3)
     subset_acc = round(SubsetAccuracy(y_pre, y_tgt), 3)
 
-    print('模型推理结果！')
-
     print('越大越好'
           '| 子集准确率{}'
           '| 平均精确度{}'.format(subset_acc, average_p))
+    f.write('越大越好'
+          '| 子集准确率{}'
+          '| 平均精确度{}\n'.format(subset_acc, average_p))
 
     print('越小越好'
+          '| 汉明损失{}'
+          '| 唯一错误率{}'
+          '| 平均度{}'
+          '| 排名损失{}\n'.format(hamming_loss, coverage, one_error, rank_loss))
+    f.write('越小越好'
           '| 汉明损失{}'
           '| 唯一错误率{}'
           '| 平均度{}'

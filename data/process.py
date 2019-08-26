@@ -9,6 +9,7 @@ import numpy as np
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import BallTree, KDTree
+import random
 
 import sys
 sys.path.append(os.path.abspath('..'))
@@ -61,7 +62,6 @@ class Process:
             fea = preprocessing.MaxAbsScaler().fit_transform(fea)
         elif config.fea_norm == 0:  # 特征数据不进行归一化
             fea = fea
-
 
         self.ins_num, self.fea_num = fea.shape
         self.lab_num = lab_num
@@ -187,18 +187,23 @@ class Process:
             特征链类型
                 mix 按照和当前示例的相似度由小到大排列，两两之间插入本示例
                 last 按照和当前示例的相似度由小到大排列，最后放上本示例
+                mix random 找出和当前示例的相似的特征最近邻，打乱他们，两两之间插入本示例
         :param chain_type: 特征链类型
         :param train_k: 训练集的k个特征最近邻
         :param val_k: 验证集的k个特征最近邻
         :param infer_k: 推理集的k个特征最近邻
         :return: 训练，验证和推理的特征链
         """
-        def __build_fea_chain(k_ins):
+        def __build_fea_chain(k_ins, random_order=False):
             """
             构建特征链
             :param k: k个特征最近邻
             :return: 2k长度的特征链
             """
+            if random_order:  # 随机打乱最近邻
+                for i in k_ins:
+                    np.random.shuffle(i[:-1])
+
             all_chain = []  # 全体特征链
             for i in k_ins:
                 own = i[-1]  # 本示例
@@ -210,13 +215,30 @@ class Process:
 
             return all_chain
 
-        if  chain_type == 'last':  # 最后放置种类型的特征链
-            return train_k, val_k, infer_k
+        def array_2_list(k_ins):
+            a = []
+            for i in range(k_ins.shape[0]):
+                b = []
+                for j in range(k_ins.shape[1]):
+                    b.append(int(k_ins[i][j]))
+                a.append(b)
+
+            return a
+
+        if chain_type == 'last':  # 最后放置种类型的特征链
+            return array_2_list(train_k), array_2_list(val_k), array_2_list(infer_k)
 
         if chain_type == 'mix':  # 混合类型的特征链
             train_chain = __build_fea_chain(train_k)  # 训练特征链
             val_chain = __build_fea_chain(val_k)  # 验证特征链
             infer_chain = __build_fea_chain(infer_k)  # 推理特征链
+
+            return train_chain, val_chain, infer_chain
+
+        if chain_type == 'mix-random':  # 混合类型的特征链，最近邻标记随机打乱
+            train_chain = __build_fea_chain(train_k, True)  # 训练特征链
+            val_chain = __build_fea_chain(val_k, True)  # 验证特征链
+            infer_chain = __build_fea_chain(infer_k, True)  # 推理特征链
 
             return train_chain, val_chain, infer_chain
 
@@ -239,7 +261,7 @@ class Process:
             chain_lab = []  # 特征链-标签
             for i in chain:
                 own = i[-1]  # 当前示例
-                labels = lab[own]
+                labels = lab[int(own)]
                 pos_lab = []  # 正标签
                 neg_lab = []  # 负标签
                 for idx, j in enumerate(labels):
