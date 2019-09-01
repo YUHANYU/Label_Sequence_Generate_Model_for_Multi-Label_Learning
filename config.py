@@ -21,7 +21,7 @@ class Config:
         self.i_batch_size = 1  # 测试批次数据
 
         self.lr_1 = 0.00001  # 模型学习率
-        self.lr_2 = 0.000005
+        self.lr_2 = 0.000007
 
         self.sos = 0  # 序列开始符
         self.eos = 1  # 序列结束符
